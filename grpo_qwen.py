@@ -142,7 +142,7 @@ def xmlcount_reward_func(completions, **kwargs) -> list[float]:
     return [count_xml(c) for c in contents]
 
 #model_name = "meta-llama/Llama-3.2-1B-Instruct"
-model_name = "Qwen/Qwen2.5-1.5B-Instruct"
+model_name = "Qwen/Qwen2.5-7B-Instruct"
 seed=42
 
 
@@ -152,13 +152,13 @@ if "Llama" in model_name:
     output_dir = "outputs/Llama-1B-GRPO"
     run_name = "Llama-1B-GRPO-gsm8k"
 else:
-    run_name=model_name + '-gsm8k-fdsp-' + 'seed' + str(seed)
+    run_name=model_name + '-gsm8k-zero1-' + 'seed' + str(seed)
     output_dir="outputs/"+run_name
     
 training_args = GRPOConfig(
     output_dir=output_dir,
     run_name=run_name,
-    learning_rate=5e-6,
+    learning_rate=1e-6,
     beta = 0.0,
     adam_beta1 = 0.9,
     adam_beta2 = 0.99,
@@ -178,8 +178,7 @@ training_args = GRPOConfig(
     max_grad_norm=0.1,
     report_to="wandb",
     log_on_each_node=False,
-    #ds3_gather_16bit_weights_on_generate=True,   # <-- key bit
-    sync_ref_model=True,
+    #sync_ref_model=True,
     #ref_model_sync_steps=1,
     #ddp_find_unused_parameters=False,
 )

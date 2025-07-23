@@ -168,14 +168,15 @@ def training_reward_adjustment(
 # --- Model and Training Configuration ---
 
 #model_name = "meta-llama/Llama-3.2-1B-Instruct"
-model_name = "Qwen/Qwen2.5-1.5B-Instruct"
-GAMMA = 0.999
+model_name = "Qwen/Qwen2.5-7B-Instruct"
+seed = 42
+GAMMA = 1-1e-7
 
 if "Llama" in model_name:
     output_dir = "outputs/Llama-1B-GRPO-gsm8k-discount1e-7-5gen-10epoch"
     run_name = "Llama-1B-GRPO-gsm8k-discount5e-8-5gen-5epoch"
 else:
-    run_name = model_name + '-discount-' + str(GAMMA) + '-gsm8k-2epochs-dr-beta0.1'
+    run_name=model_name + '-gsm8k-discount' + str(GAMMA) + '-seed' + str(seed)
     output_dir="outputs/"+run_name
 
 # training_args = GRPOConfig(
@@ -205,14 +206,15 @@ else:
 training_args = GRPOConfig(
     output_dir=output_dir,
     run_name=run_name,
-    learning_rate=5e-6,
+    learning_rate=1e-6,
+    beta=0.0,
     adam_beta1 = 0.9,
     adam_beta2 = 0.99,
     weight_decay = 0.1,
     warmup_ratio = 0.1,
     lr_scheduler_type='cosine',
     logging_steps=1,
-    seed = 42,
+    seed = seed,
     bf16=True,
     per_device_train_batch_size=1,
     gradient_accumulation_steps=4,
@@ -224,20 +226,12 @@ training_args = GRPOConfig(
     max_grad_norm=0.1,
     report_to="wandb",
     log_on_each_node=False,
-    beta=0.1,
-    sync_ref_model=True,
-    ref_model_sync_steps=1,
-    loss_type='dr_grpo',
-    scale_rewards=False,  
+    #sync_ref_model=True,
+    #ref_model_sync_steps=1,
+    #loss_type='dr_grpo',
+    #scale_rewards=False,  
 )
 
-peft_config = LoraConfig(
-    r=16,
-    lora_alpha=64,
-    target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "up_proj", "down_proj", "gate_proj"],
-    task_type="CAUSAL_LM",
-    lora_dropout=0.05,
-)
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     torch_dtype=torch.bfloat16,
@@ -304,7 +298,6 @@ trainer = GRPOTrainer(
     ],
     args=training_args,
     train_dataset=dataset,
-    #peft_config=peft_config
 )
 
 print(trainer.generation_config)  
@@ -317,8 +310,8 @@ trainer.train()
 
 
 
-trainer.accelerator.wait_for_everyone()
-if trainer.accelerator.is_main_process:
-    trainer.save_model(output_dir + "/final")   # or your path
-    tokenizer.save_pretrained(output_dir + "/final")
-trainer.accelerator.wait_for_everyone()
+# trainer.accelerator.wait_for_everyone()
+# if trainer.accelerator.is_main_process:
+#     trainer.save_model(output_dir + "/final")   # or your path
+#     tokenizer.save_pretrained(output_dir + "/final")
+# trainer.accelerator.wait_for_everyone()

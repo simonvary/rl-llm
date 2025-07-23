@@ -1,0 +1,30 @@
+compute_environment: LOCAL_MACHINE
+distributed_type: DEEPSPEED
+num_processes: 4
+gpu_ids: all
+machine_rank: 0
+num_machines: 1
+mixed_precision: bf16
+enable_cpu_affinity: true
+main_training_function: main
+debug: false
+rdzv_backend: static
+same_network: true
+tpu_env: []
+tpu_use_cluster: false
+tpu_use_sudo: false
+use_cpu: false
+
+# DeepSpeed config is now nested directly here
+deepspeed_config:
+  bf16:
+    enabled: true
+  optimizer:
+    type: AdamW
+    params:
+      lr: auto
+      betas: auto
+      eps: auto
+      weight_decay: auto
+  zero_optimization:
+    stage: 1
