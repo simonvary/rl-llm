@@ -152,7 +152,7 @@ if "Llama" in model_name:
     output_dir = "outputs/Llama-1B-GRPO"
     run_name = "Llama-1B-GRPO-gsm8k"
 else:
-    run_name=model_name + '-gsm8k-zero1-' + 'seed' + str(seed)
+    run_name=model_name + '-gsm8k-base-' + 'seed' + str(seed)
     output_dir="outputs/"+run_name
     
 training_args = GRPOConfig(
