@@ -142,9 +142,9 @@ def xmlcount_reward_func(completions, **kwargs) -> list[float]:
     return [count_xml(c) for c in contents]
 
 #model_name = "meta-llama/Llama-3.2-1B-Instruct"
-model_name = "Qwen/Qwen2.5-1.5B-Instruct"
-seed=42
-machine_name = '-constantlr-193'
+model_name = "Qwen/Qwen2.5-7B-Instruct"
+seed=43
+machine_name = '-constantlr-capacityblock1'
 
 
 #model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
@@ -164,7 +164,7 @@ training_args = GRPOConfig(
     adam_beta1 = 0.9,
     adam_beta2 = 0.99,
     weight_decay = 0.1,
-    warmup_ratio = 0.3,
+    warmup_ratio = 0.1,
     lr_scheduler_type='constant_with_warmup',
     logging_steps=1,
     seed = seed,
