@@ -1,6 +1,6 @@
 import re
 from datasets import load_dataset
-
+from transformers import AutoTokenizer
 from vllm import LLM, SamplingParams
 
 SYSTEM_PROMPT = """
@@ -22,7 +22,8 @@ def extract_inter_answer(text: str) -> int:
 def extract_xml_answer(text: str) -> str:
     answer = text.split("<answer>")[-1]
     answer = answer.split("</answer>")[0]
-    return extract_inter_answer(answer)
+    #print(answer)
+    return answer.strip()
 
 def extract_hash_answer(text: str) -> str | None:
     if "####" not in text:
@@ -37,7 +38,7 @@ def extract_numerical_answer(answer_text):
         return int(match.group(1).replace(",", ""))
     return None
 
-model_name = '/home/ubuntu/alex/verifiers/outputs/Qwen/Qwen2.5-7B-Instruct-gsm8k-discount0.99999-seed42capacityblock1/checkpoint-1870'
+model_name = '/home/ubuntu/alex/verifiers/outputs/Qwen/Qwen2.5-7B-Instruct-gsm8k-discount0.9999999-seed42constlr=1epoch-capacityblock1/checkpoint-800'
 
 llm = LLM(
     model=model_name,
@@ -50,12 +51,25 @@ llm = LLM(
 )
 
 data = load_dataset("openai/gsm8k", "main")["test"]
-
+tokenizer = AutoTokenizer.from_pretrained(model_name)
 eval_data = []
 for i, item in enumerate(data):
+    # Create the chat structure, same as in training
+    chat = [
+        {'role': 'system', 'content': SYSTEM_PROMPT},
+        {'role': 'user', 'content': item["question"]},
+    ]
+    
+    # Apply the template to get the correctly formatted prompt string
+    formatted_prompt = tokenizer.apply_chat_template(
+        chat,
+        tokenize=False,
+        add_generation_prompt=True # Adds the prompt for the assistant's turn
+    )
+    
     proccessed = {
         "question": item["question"],
-        "prompt": SYSTEM_PROMPT + " " + item["question"],
+        "prompt": formatted_prompt, # Use the correctly formatted prompt
         "answer": item["answer"],
         "numerical_answer": extract_numerical_answer(item["answer"]),
         "other_answer": extract_hash_answer(item["answer"]),
@@ -72,9 +86,10 @@ correct = 0
 for i, output in enumerate(outputs):
     generated_text = output.outputs[0].text
     predicted_answer = extract_xml_answer(generated_text)
-    ground_truth = eval_data[i]["numerical_answer"]
+    ground_truth = eval_data[i]["other_answer"]
     #print(ground_truth, predicted_answer)
-    if int(predicted_answer) == int(ground_truth):
+    #if int(predicted_answer) == int(ground_truth):
+    if predicted_answer == ground_truth:
         correct += 1
     print(correct / (i+1))
 
