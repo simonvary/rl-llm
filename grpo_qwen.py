@@ -198,61 +198,20 @@ def xmlcount_reward_func(completions, **kwargs) -> list[float]:
     return [count_xml(c) for c in contents]
 
 #model_name = "meta-llama/Llama-3.2-1B-Instruct"
-<<<<<<< HEAD
-model_name = "Qwen/Qwen2.5-7B-Instruct"
-seed=43
-machine_name = '-constantlr-1epoch-capacityblock2'
-=======
 model_name = args.model_name
 seed=args.seed
 machine_name = args.machine_name
->>>>>>> d94e854086583cae4b88776b45ba0550b2bb29a0
 
 
 #model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
 
-<<<<<<< HEAD
-if "Llama" in model_name:
-    output_dir = "outputs/Llama-1B-GRPO"
-    run_name = "Llama-1B-GRPO-gsm8k"
-else:
-    run_name=model_name + '-gsm8k-base-' + 'seed' + str(seed) + machine_name
-    output_dir="outputs/"+run_name
-=======
 model_short_name = args.model_name.split("/")[-1]
 run_name = f"{model_short_name}-gsm8k-base-seed{args.seed}-{args.machine_name}"
 output_dir = f"{args.output_dir}/{run_name}"
->>>>>>> d94e854086583cae4b88776b45ba0550b2bb29a0
     
 training_args = GRPOConfig(
     output_dir=output_dir,
     run_name=run_name,
-<<<<<<< HEAD
-    learning_rate=5e-6,
-    beta = 0.4,
-    adam_beta1 = 0.9,
-    adam_beta2 = 0.99,
-    weight_decay = 0.1,
-    warmup_ratio = 0.1,
-    lr_scheduler_type='constant_with_warmup',
-    logging_steps=1,
-    seed = seed,
-    bf16=True,
-    per_device_train_batch_size=1,
-    gradient_accumulation_steps=4,
-    num_generations=4,
-    max_prompt_length=256,
-    max_completion_length=786,
-    num_train_epochs=1,
-    save_steps=400,
-    max_grad_norm=0.1,
-    report_to="wandb",
-    log_on_each_node=False,
-    overwrite_output_dir=True,
-    disable_dropout=True,  # Important for consistent generation
-    sync_ref_model=True,
-    ref_model_sync_steps=16,
-=======
     learning_rate=args.learning_rate,
     beta = args.beta,
     adam_beta1 = 0.9,
@@ -278,7 +237,6 @@ training_args = GRPOConfig(
     sync_ref_model=args.sync_ref_model,
     ref_model_sync_steps=args.ref_model_sync_steps,
     temperature=args.temperature,
->>>>>>> d94e854086583cae4b88776b45ba0550b2bb29a0
     #ddp_find_unused_parameters=False,
 )
 

@@ -223,24 +223,10 @@ def training_reward_adjustment(
 # --- Model and Training Configuration ---
 
 #model_name = "meta-llama/Llama-3.2-1B-Instruct"
-<<<<<<< HEAD
-model_name = "Qwen/Qwen2.5-7B-Instruct"
-seed = 42
-GAMMA = 1.0 - 1e-6
-machine_name = 'constlr=1epoch-capacityblock2'
-
-if "Llama" in model_name:
-    output_dir = "outputs/Llama-1B-GRPO-gsm8k-discount1e-7-5gen-10epoch"
-    run_name = "Llama-1B-GRPO-gsm8k-discount5e-8-5gen-5epoch"
-else:
-    run_name=model_name + '-gsm8k-discount' + str(GAMMA) + '-seed' + str(seed) + machine_name
-    output_dir="outputs/"+run_name
-=======
 model_name = args.model_name
 seed=args.seed
 machine_name = args.machine_name
 GAMMA = args.gamma
->>>>>>> d94e854086583cae4b88776b45ba0550b2bb29a0
 
 model_short_name = args.model_name.split("/")[-1]
 run_name = f"{model_short_name}-gsm8k-gamma{GAMMA}-seed{args.seed}-{args.machine_name}"
@@ -254,32 +240,6 @@ training_args = GRPOConfig(
     beta = args.beta,
     adam_beta1 = 0.9,
     adam_beta2 = 0.99,
-<<<<<<< HEAD
-    weight_decay = 0.1,
-    warmup_ratio = 0.1,
-    lr_scheduler_type='constant_with_warmup',
-    logging_steps=1,
-    seed = seed,
-    bf16=True,
-    per_device_train_batch_size=1,
-    gradient_accumulation_steps=4,
-    num_generations=4,
-    max_prompt_length=256,
-    max_completion_length=786,
-    num_train_epochs=1,
-    save_steps=400,
-    max_grad_norm=0.1,
-    report_to="wandb",
-    log_on_each_node=False,
-    overwrite_output_dir=True,
-    disable_dropout=True,  # Important for consistent generation
-    sync_ref_model=True,
-    ref_model_sync_steps=16,
-    temperature=1.0,
-    #use_liger_loss=True
-    #loss_type='dr_grpo',
-    #scale_rewards=False,  
-=======
     weight_decay = args.weight_decay,
     warmup_ratio = args.warmup_ratio,
     lr_scheduler_type=args.lr_scheduler_type,
@@ -302,7 +262,6 @@ training_args = GRPOConfig(
     ref_model_sync_steps=args.ref_model_sync_steps,
     temperature=args.temperature,
     #ddp_find_unused_parameters=False,
->>>>>>> d94e854086583cae4b88776b45ba0550b2bb29a0
 )
 
 model = AutoModelForCausalLM.from_pretrained(
