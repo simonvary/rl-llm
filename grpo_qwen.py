@@ -144,7 +144,7 @@ def xmlcount_reward_func(completions, **kwargs) -> list[float]:
 #model_name = "meta-llama/Llama-3.2-1B-Instruct"
 model_name = "Qwen/Qwen2.5-7B-Instruct"
 seed=43
-machine_name = '-constantlr-capacityblock1'
+machine_name = '-constantlr-1epoch-capacityblock2'
 
 
 #model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
@@ -174,7 +174,7 @@ training_args = GRPOConfig(
     num_generations=4,
     max_prompt_length=256,
     max_completion_length=786,
-    num_train_epochs=2,
+    num_train_epochs=1,
     save_steps=400,
     max_grad_norm=0.1,
     report_to="wandb",
@@ -183,6 +183,7 @@ training_args = GRPOConfig(
     disable_dropout=True,  # Important for consistent generation
     sync_ref_model=True,
     ref_model_sync_steps=16,
+    #ddp_find_unused_parameters=False,
 )
 
 model = AutoModelForCausalLM.from_pretrained(
