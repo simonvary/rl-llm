@@ -170,8 +170,8 @@ def training_reward_adjustment(
 #model_name = "meta-llama/Llama-3.2-1B-Instruct"
 model_name = "Qwen/Qwen2.5-7B-Instruct"
 seed = 43
-GAMMA = 1.0 - 1e-7
-machine_name = 'constlr-capacityblock1'
+GAMMA = 1.0 - 2.5e-7
+machine_name = 'constlr-1epoch-capacityblock0'
 
 if "Llama" in model_name:
     output_dir = "outputs/Llama-1B-GRPO-gsm8k-discount1e-7-5gen-10epoch"
@@ -190,7 +190,7 @@ training_args = GRPOConfig(
     adam_beta1 = 0.9,
     adam_beta2 = 0.99,
     weight_decay = 0.1,
-    warmup_ratio = 0.3,
+    warmup_ratio = 0.1,
     lr_scheduler_type='constant_with_warmup',
     logging_steps=1,
     seed = seed,
@@ -200,7 +200,7 @@ training_args = GRPOConfig(
     num_generations=4,
     max_prompt_length=256,
     max_completion_length=786,
-    num_train_epochs=2,
+    num_train_epochs=1,
     save_steps=400,
     max_grad_norm=0.1,
     report_to="wandb",
