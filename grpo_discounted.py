@@ -170,19 +170,14 @@ def training_reward_adjustment(
 #model_name = "meta-llama/Llama-3.2-1B-Instruct"
 model_name = "Qwen/Qwen2.5-1.5B-Instruct"
 seed = 42
-GAMMA = 1-1e-8
-BETA = 0.4
-machine_name = '-155'
-model_name = "Qwen/Qwen2.5-7B-Instruct"
-seed = 43
 GAMMA = 1.0 - 1e-7
-machine_name = 'constlr-capacityblock1'
+machine_name = 'constlr-155'
 
 if "Llama" in model_name:
     output_dir = "outputs/Llama-1B-GRPO-gsm8k-discount1e-7-5gen-10epoch"
     run_name = "Llama-1B-GRPO-gsm8k-discount5e-8-5gen-5epoch"
 else:
-    run_name=model_name + '-gsm8k-discount' + str(GAMMA) + '-beta-'+ str(BETA) + '-seed' + str(seed) + machine_name
+    run_name=model_name + '-gsm8k-discount' + str(GAMMA) + '-seed' + str(seed) + machine_name
     output_dir="outputs/"+run_name
 
 
@@ -191,12 +186,10 @@ training_args = GRPOConfig(
     output_dir=output_dir,
     run_name=run_name,
     learning_rate=5e-6,
-    beta=BETA,
+    beta=0.4,
     adam_beta1 = 0.9,
     adam_beta2 = 0.99,
     weight_decay = 0.1,
-    warmup_ratio = 0.1,
-    lr_scheduler_type='cosine',
     warmup_ratio = 0.3,
     lr_scheduler_type='constant_with_warmup',
     logging_steps=1,
@@ -217,9 +210,6 @@ training_args = GRPOConfig(
     sync_ref_model=True,
     ref_model_sync_steps=16,
     temperature=1.0,
-    #use_liger_loss=True
-    #loss_type='dr_grpo',
-    #scale_rewards=False,  
 )
 
 model = AutoModelForCausalLM.from_pretrained(
