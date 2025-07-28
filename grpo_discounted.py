@@ -32,7 +32,7 @@ def get_args():
 
     # Training Hyperparameters
     parser.add_argument("--learning_rate", type=float, default=5e-6, help="The learning rate for the AdamW optimizer.")
-    parser.add_argument("--gamma", type=float, default=1e-7, help="The discount factor for controlling lengths of completions in the GRPO loss.")
+    parser.add_argument("--gamma", type=float, default=1-1e-7, help="The discount factor for controlling lengths of completions in the GRPO loss.")
     parser.add_argument("--beta", type=float, default=0.4, help="The beta parameter for the GRPO loss.")
     parser.add_argument("--num_train_epochs", type=int, default=1, help="Total number of training epochs.")
     parser.add_argument("--per_device_train_batch_size", type=int, default=1, help="Training batch size per device.")
@@ -48,7 +48,6 @@ def get_args():
     parser.add_argument("--ref_model_sync_steps", type=int, default=32, help="Steps between syncing the reference model.")
     parser.add_argument("--sync_ref_model", action='store_true', help="Disable kl regularization in the model")
     parser.add_argument("--disable_dropout", action='store_true', help="Disable dropout in the model.")
-    parser.set_defaults(disable_dropout=True)
 
 
     # Generation Lengths
@@ -338,6 +337,7 @@ print("→ max_new_tokens:", trainer.generation_config.max_new_tokens)
 print("→ temperature:   ", trainer.generation_config.temperature)
 print("→ top_p:         ", trainer.generation_config.top_p)
 print("→ gamma:         ", GAMMA)
+print("→ ref_sync:      ", args.sync_ref_model)
 
 trainer.train()
 

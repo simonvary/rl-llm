@@ -198,15 +198,9 @@ def xmlcount_reward_func(completions, **kwargs) -> list[float]:
     return [count_xml(c) for c in contents]
 
 #model_name = "meta-llama/Llama-3.2-1B-Instruct"
-<<<<<<< HEAD
-model_name = "Qwen/Qwen2.5-7B-Instruct"
-seed=43
-machine_name = '-constantlr-capacityblock0'
-=======
 model_name = args.model_name
 seed=args.seed
 machine_name = args.machine_name
->>>>>>> 0ef8986953915ae999140053c0b8e12cada9bac8
 
 
 #model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
@@ -222,23 +216,6 @@ training_args = GRPOConfig(
     beta = args.beta,
     adam_beta1 = 0.9,
     adam_beta2 = 0.99,
-<<<<<<< HEAD
-    weight_decay = 0.1,
-    warmup_ratio = 0.1,
-    lr_scheduler_type='constant_with_warmup',
-    logging_steps=1,
-    seed = seed,
-    bf16=True,
-    per_device_train_batch_size=1,
-    gradient_accumulation_steps=4,
-    num_generations=4,
-    max_prompt_length=256,
-    max_completion_length=786,
-    num_train_epochs=1,
-    save_steps=400,
-    max_grad_norm=0.1,
-    report_to="wandb",
-=======
     weight_decay = args.weight_decay,
     warmup_ratio = args.warmup_ratio,
     lr_scheduler_type=args.lr_scheduler_type,
@@ -254,7 +231,6 @@ training_args = GRPOConfig(
     save_steps=args.save_steps,
     max_grad_norm=args.max_grad_norm,
     report_to=args.report_to,
->>>>>>> 0ef8986953915ae999140053c0b8e12cada9bac8
     log_on_each_node=False,
     overwrite_output_dir=True,
     disable_dropout=args.disable_dropout,  # Important for consistent generation
