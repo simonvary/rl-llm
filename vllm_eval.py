@@ -38,7 +38,7 @@ def extract_numerical_answer(answer_text):
         return int(match.group(1).replace(",", ""))
     return None
 
-model_name = '/home/ubuntu/alex/verifiers/outputs/Qwen/Qwen2.5-7B-Instruct-gsm8k-discount0.9999999-seed42constlr=1epoch-capacityblock1/checkpoint-800'
+model_name = '/home/ubuntu/alex/verifiers/outputs/Qwen/Qwen2.5-7B-Instruct-gsm8k-discount0.9999999-seed42constlr=1epoch-capacityblock1/checkpoint-935'
 
 llm = LLM(
     model=model_name,

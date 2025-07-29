@@ -74,7 +74,7 @@ def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[floa
     extracted_responses = [extract_xml_answer(r) for r in responses]
     #print('-'*20, f"Question:\n{q}", f"\nAnswer:\n{answer[0]}", f"\nResponse:\n{responses[0]}", f"\nExtracted:\n{extracted_responses[0]}")
     # Return a larger reward for correctness to make its signal stronger
-    return [2.0 + np.random.normal(scale=GAMMA) if r == a else 0.0 for r, a in zip(extracted_responses, answer)]
+    return [2.0 if r == a else 0.0 for r, a in zip(extracted_responses, answer)]
 
 # Other shaping rewards
 def int_reward_func(completions, **kwargs) -> list[float]:
