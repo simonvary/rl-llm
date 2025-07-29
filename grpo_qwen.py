@@ -5,6 +5,10 @@
 
 import re
 import torch
+<<<<<<< HEAD
+=======
+import argparse
+>>>>>>> 2c703ba13882c890ae13293361909ec3eb8b378f
 from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import LoraConfig
@@ -12,6 +16,64 @@ from trl import GRPOConfig, GRPOTrainer
 from functools import partial
 
 
+<<<<<<< HEAD
+=======
+# ----------------------------------------------------------------------------
+# Argument Parser
+# ----------------------------------------------------------------------------
+def get_args():
+    """Parses command-line arguments."""
+    parser = argparse.ArgumentParser(description="Train a model using GRPOTrainer with configurable arguments.")
+
+    # Model and Tokenizer
+    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-7B-Instruct", help="The name of the base model to use from Hugging Face Hub.")
+    parser.add_argument("--attn_implementation", type=str, default="flash_attention_2", help="Attention implementation (e.g., 'flash_attention_2'). Use 'eager' for non-flash attention.")
+
+    # Dataset
+    parser.add_argument("--dataset_name", type=str, default="openai/gsm8k", help="The name of the dataset to use.")
+    parser.add_argument("--dataset_subset", type=str, default="main", help="The subset of the dataset to use.")
+
+    # Training Hyperparameters
+    parser.add_argument("--learning_rate", type=float, default=5e-6, help="The learning rate for the AdamW optimizer.")
+    parser.add_argument("--beta", type=float, default=0.4, help="The beta parameter for the GRPO loss.")
+    parser.add_argument("--num_train_epochs", type=int, default=1, help="Total number of training epochs.")
+    parser.add_argument("--per_device_train_batch_size", type=int, default=1, help="Training batch size per device.")
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=4, help="Number of steps for gradient accumulation.")
+    parser.add_argument("--warmup_ratio", type=float, default=0.1, help="Warmup ratio for the learning rate scheduler.")
+    parser.add_argument("--lr_scheduler_type", type=str, default="constant_with_warmup", help="Learning rate scheduler type.")
+    parser.add_argument("--weight_decay", type=float, default=0.1, help="Weight decay for the optimizer.")
+    parser.add_argument("--max_grad_norm", type=float, default=0.1, help="Maximum gradient norm for clipping.")
+    parser.add_argument("--temperature", type=float, default=1.0, help="Generation temperature for sampling.")
+
+    # GRPO Specific
+    parser.add_argument("--num_generations", type=int, default=4, help="Number of generations per prompt for GRPO.")
+    parser.add_argument("--ref_model_sync_steps", type=int, default=32, help="Steps between syncing the reference model.")
+    parser.add_argument("--sync_ref_model", action='store_true', help="Disable kl regularization in the model")
+    parser.add_argument("--disable_dropout", action='store_true', help="Disable dropout in the model.")
+    parser.set_defaults(disable_dropout=True)
+
+
+    # Generation Lengths
+    parser.add_argument("--max_prompt_length", type=int, default=256, help="Maximum prompt length in tokens.")
+    parser.add_argument("--max_completion_length", type=int, default=786, help="Maximum completion length (max_new_tokens).")
+
+    # Run Configuration
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
+    parser.add_argument("--machine_name", type=str, default='default', help="A name for the machine or environment to append to the run name.")
+    parser.add_argument("--run_name", type=str, default=None, help="Custom name for the W&B run. If not set, it's generated automatically.")
+    parser.add_argument("--output_dir", type=str, default="outputs", help="The base directory to save model outputs and checkpoints.")
+    parser.add_argument("--report_to", type=str, default="wandb", help="Report results to 'wandb' or 'none'.")
+
+
+    # Logging and Saving
+    parser.add_argument("--logging_steps", type=int, default=1, help="Log every N steps.")
+    parser.add_argument("--save_steps", type=int, default=400, help="Save a checkpoint every N steps.")
+
+    return parser.parse_args()
+args = get_args()
+
+
+>>>>>>> 2c703ba13882c890ae13293361909ec3eb8b378f
 
 # Load and prep dataset
 
@@ -142,23 +204,36 @@ def xmlcount_reward_func(completions, **kwargs) -> list[float]:
     return [count_xml(c) for c in contents]
 
 #model_name = "meta-llama/Llama-3.2-1B-Instruct"
+<<<<<<< HEAD
 model_name = "Qwen/Qwen2.5-7B-Instruct"
 seed=43
 machine_name = '-constantlr-capacityblock1'
+=======
+model_name = args.model_name
+seed=args.seed
+machine_name = args.machine_name
+>>>>>>> 2c703ba13882c890ae13293361909ec3eb8b378f
 
 
 #model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
 
+<<<<<<< HEAD
 if "Llama" in model_name:
     output_dir = "outputs/Llama-1B-GRPO"
     run_name = "Llama-1B-GRPO-gsm8k"
 else:
     run_name=model_name + '-gsm8k-base-' + 'seed' + str(seed) + machine_name
     output_dir="outputs/"+run_name
+=======
+model_short_name = args.model_name.split("/")[-1]
+run_name = f"{model_short_name}-gsm8k-base-seed{args.seed}-{args.machine_name}"
+output_dir = f"{args.output_dir}/{run_name}"
+>>>>>>> 2c703ba13882c890ae13293361909ec3eb8b378f
     
 training_args = GRPOConfig(
     output_dir=output_dir,
     run_name=run_name,
+<<<<<<< HEAD
     learning_rate=5e-6,
     beta = 0.4,
     adam_beta1 = 0.9,
@@ -183,6 +258,34 @@ training_args = GRPOConfig(
     disable_dropout=True,  # Important for consistent generation
     sync_ref_model=True,
     ref_model_sync_steps=16,
+=======
+    learning_rate=args.learning_rate,
+    beta = args.beta,
+    adam_beta1 = 0.9,
+    adam_beta2 = 0.99,
+    weight_decay = args.weight_decay,
+    warmup_ratio = args.warmup_ratio,
+    lr_scheduler_type=args.lr_scheduler_type,
+    logging_steps=args.logging_steps,
+    seed = seed,
+    bf16=True,
+    per_device_train_batch_size=args.per_device_train_batch_size,
+    gradient_accumulation_steps=args.gradient_accumulation_steps,
+    num_generations=args.num_generations,
+    max_prompt_length=args.max_prompt_length,
+    max_completion_length=args.max_completion_length,
+    num_train_epochs=args.num_train_epochs,
+    save_steps=args.save_steps,
+    max_grad_norm=args.max_grad_norm,
+    report_to=args.report_to,
+    log_on_each_node=False,
+    overwrite_output_dir=True,
+    disable_dropout=args.disable_dropout,  # Important for consistent generation
+    sync_ref_model=args.sync_ref_model,
+    ref_model_sync_steps=args.ref_model_sync_steps,
+    temperature=args.temperature,
+    #ddp_find_unused_parameters=False,
+>>>>>>> 2c703ba13882c890ae13293361909ec3eb8b378f
 )
 
 model = AutoModelForCausalLM.from_pretrained(
@@ -216,4 +319,8 @@ trainer.accelerator.wait_for_everyone()
 if trainer.accelerator.is_main_process:
     trainer.save_model(output_dir + "/final")   # or your path
     tokenizer.save_pretrained(output_dir + "/final")
+<<<<<<< HEAD
 trainer.accelerator.wait_for_everyone()
+=======
+trainer.accelerator.wait_for_everyone()
+>>>>>>> 2c703ba13882c890ae13293361909ec3eb8b378f
