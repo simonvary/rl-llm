@@ -23,7 +23,8 @@ def get_args():
     parser = argparse.ArgumentParser(description="Train a model using GRPOTrainer with configurable arguments.")
 
     # Model and Tokenizer
-    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-7B-Instruct", help="The name of the base model to use from Hugging Face Hub.")
+    # --- MODIFICATION: Changed the default model to a Gemma Instruct model ---
+    parser.add_argument("--model_name", type=str, default="google/gemma-2-9b-it", help="The name of the base model to use from Hugging Face Hub.")
     parser.add_argument("--attn_implementation", type=str, default="flash_attention_2", help="Attention implementation (e.g., 'flash_attention_2'). Use 'eager' for non-flash attention.")
 
     # Dataset
@@ -103,16 +104,19 @@ def extract_hash_answer(text: str) -> str | None:
         return None
     return text.split("####")[1].strip().replace(",", "").replace("$", "")
 
-# uncomment middle messages for 1-shot prompting
+# --- MODIFICATION: Updated prompt format for Gemma models ---
+# Gemma's chat template does not support the 'system' role.
+# System instructions are prepended to the user's first message.
 def get_gsm8k_questions(split = "train") -> Dataset:
     data = load_dataset('openai/gsm8k', 'main')[split] # type: ignore
-    data = data.map(lambda x: { # type: ignore
-        'prompt': [
-            {'role': 'system', 'content': SYSTEM_PROMPT},
-            {'role': 'user', 'content': x['question']}
-        ],
-        'answer': extract_hash_answer(x['answer'])
-    }) # type: ignore
+    def create_gemma_prompt(x):
+        # Combine system instructions and user question into a single user message
+        full_prompt = f"{SYSTEM_PROMPT.strip()}\n\n{x['question']}"
+        return {
+            'prompt': [{'role': 'user', 'content': full_prompt}],
+            'answer': extract_hash_answer(x['answer'])
+        }
+    data = data.map(create_gemma_prompt) # type: ignore
     return data # type: ignore
 
 dataset = get_gsm8k_questions()
@@ -120,7 +124,8 @@ dataset = get_gsm8k_questions()
 # Base Reward function (used by others)
 def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[float]:
     responses = [completion[0]['content'] for completion in completions]
-    q = prompts[0][-1]['content']
+    # For Gemma, the full prompt is in the first (and only) message
+    q = prompts[0][0]['content']
     extracted_responses = [extract_xml_answer(r) for r in responses]
     print('-'*20, f"Question:\n{q}", f"\nAnswer:\n{answer[0]}", f"\nResponse:\n{responses[0]}", f"\nExtracted:\n{extracted_responses[0]}")
     # Return a larger reward for correctness to make its signal stronger
@@ -217,7 +222,6 @@ def training_reward_adjustment(
 
 # --- Model and Training Configuration ---
 
-#model_name = "meta-llama/Llama-3.2-1B-Instruct"
 model_name = args.model_name
 seed=args.seed
 machine_name = args.machine_name
@@ -270,7 +274,12 @@ model.config.use_cache = False
 
 
 tokenizer = AutoTokenizer.from_pretrained(model_name)
-tokenizer.pad_token = tokenizer.eos_token
+# --- MODIFICATION: Set pad_token if it's not already set ---
+# Many models like Gemma do not have a pad_token by default.
+# Setting it to the eos_token is a common practice for autoregressive models.
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
 
 # --- Configure the GRPOTrainer with the Correct Reward Functions ---
 
