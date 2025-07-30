@@ -339,9 +339,12 @@ print("→ top_p:         ", trainer.generation_config.top_p)
 print("→ gamma:         ", GAMMA)
 print("→ ref_sync:      ", args.sync_ref_model)
 print("→ disable_dropout:      ", args.disable_dropout)
+print("→ warmup_ratio:        ", args.warmup_ratio)
 
-trainer.train()
-
+try:
+    trainer.train()
+finally:
+    trainer.save_model(output_dir + "/final")  
 
 
 # trainer.accelerator.wait_for_everyone()
