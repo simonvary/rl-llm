@@ -1,39 +1,34 @@
 python grpo_discounted.py \
-    --model_name "Qwen/Qwen2.5-7B-Instruct" \
-    --gamma 0.99999975 \
+    --model_name "Qwen/Qwen2.5-1.5B-Instruct" \
+    --gamma 0.999999 \
     --seed 43 \
-    --machine_name "5gen-1epoch-capacityblock2"\
+    --machine_name "1epoch-capacityblock2" \
     --sync_ref_model \
     --disable_dropout \
-    --ref_model_sync_steps 16 \
+    --ref_model_sync_steps 8 \
     --warmup_ratio 0.1 \
-    --num_generations 5 \
-    --gradient_accumulation_steps 5 \
+    --beta 0.1 \
 
+python grpo_discounted.py \
+    --model_name "Qwen/Qwen2.5-1.5B-Instruct" \
+    --gamma 0.9999995 \
+    --seed 43 \
+    --machine_name "1epoch-capacityblock2" \
+    --sync_ref_model \
+    --disable_dropout \
+    --ref_model_sync_steps 8 \
+    --warmup_ratio 0.1 \
+    --beta 0.1 \
 
-# python grpo_discounted.py \
-#     --model_name "Qwen/Qwen2.5-7B-Instruct" \
-#     --gamma 1.0 \
-#     --seed 40 \
-#     --machine_name "constantlr-1epoch-capacityblock2" \
-#     --sync_ref_model \
-#     --disable_dropout \
-#     --ref_model_sync_steps 16 \
+python grpo_discounted.py \
+    --model_name "Qwen/Qwen2.5-1.5B-Instruct" \
+    --gamma 0.9999999 \
+    --seed 43 \
+    --machine_name "1epoch-capacityblock2" \
+    --sync_ref_model \
+    --disable_dropout \
+    --ref_model_sync_steps 8 \
+    --warmup_ratio 0.1 \
+    --beta 0.1 \
 
-# python grpo_discounted.py \
-#     --model_name "Qwen/Qwen2.5-7B-Instruct" \
-#     --gamma 1.0 \
-#     --seed 39 \
-#     --machine_name "constantlr-1epoch-capacityblock2" \
-#     --sync_ref_model \
-#     --disable_dropout \
-#     --ref_model_sync_steps 16 \
-
-# python grpo_discounted.py \
-#     --model_name "Qwen/Qwen2.5-7B-Instruct" \
-#     --gamma 1.0 \
-#     --seed 38 \
-#     --machine_name "constantlr-1epoch-capacityblock2" \
-#     --sync_ref_model \
-#     --disable_dropout \
-#     --ref_model_sync_steps 16 \
+aws s3 sync outputs/ s3://starfish-science-dev/ayoualex/outputs_capacityblock2/
