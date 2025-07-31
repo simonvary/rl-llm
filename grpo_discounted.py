@@ -338,10 +338,12 @@ print("→ temperature:   ", trainer.generation_config.temperature)
 print("→ top_p:         ", trainer.generation_config.top_p)
 print("→ gamma:         ", GAMMA)
 print("→ ref_sync:      ", args.sync_ref_model)
-print("→ ref_sync:      ", args.disable_dropout)
+print("→ disable_dropout:      ", args.disable_dropout)
 
-trainer.train()
-
+try:
+    trainer.train()
+finally:
+    trainer.save_model(output_dir + "/final")  
 
 
 # trainer.accelerator.wait_for_everyone()
