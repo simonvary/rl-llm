@@ -1,6 +1,7 @@
 # train_grpo.py
 #
 # See https://github.com/willccbb/verifiers for ongoing developments
+#
 
 
 import re
@@ -10,8 +11,9 @@ from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import LoraConfig
 from trl import GRPOConfig, GRPOTrainer
+import numpy as np
+from accelerate import Accelerator
 from functools import partial
-
 
 # ----------------------------------------------------------------------------
 # Argument Parser
@@ -21,7 +23,8 @@ def get_args():
     parser = argparse.ArgumentParser(description="Train a model using GRPOTrainer with configurable arguments.")
 
     # Model and Tokenizer
-    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-7B-Instruct", help="The name of the base model to use from Hugging Face Hub.")
+    # --- MODIFICATION: Changed the default model to a Gemma Instruct model ---
+    parser.add_argument("--model_name", type=str, default="google/gemma-2-9b-it", help="The name of the base model to use from Hugging Face Hub.")
     parser.add_argument("--attn_implementation", type=str, default="flash_attention_2", help="Attention implementation (e.g., 'flash_attention_2'). Use 'eager' for non-flash attention.")
 
     # Dataset
@@ -30,6 +33,7 @@ def get_args():
 
     # Training Hyperparameters
     parser.add_argument("--learning_rate", type=float, default=5e-6, help="The learning rate for the AdamW optimizer.")
+    parser.add_argument("--gamma", type=float, default=1-1e-7, help="The discount factor for controlling lengths of completions in the GRPO loss.")
     parser.add_argument("--beta", type=float, default=0.4, help="The beta parameter for the GRPO loss.")
     parser.add_argument("--num_train_epochs", type=int, default=1, help="Total number of training epochs.")
     parser.add_argument("--per_device_train_batch_size", type=int, default=1, help="Training batch size per device.")
@@ -45,7 +49,6 @@ def get_args():
     parser.add_argument("--ref_model_sync_steps", type=int, default=32, help="Steps between syncing the reference model.")
     parser.add_argument("--sync_ref_model", action='store_true', help="Disable kl regularization in the model")
     parser.add_argument("--disable_dropout", action='store_true', help="Disable dropout in the model.")
-    parser.set_defaults(disable_dropout=True)
 
 
     # Generation Lengths
@@ -69,6 +72,7 @@ args = get_args()
 
 
 
+
 # Load and prep dataset
 
 SYSTEM_PROMPT = """
@@ -81,26 +85,7 @@ Respond in the following format:
 </answer>
 """
 
-# SYSTEM_PROMPT = """
-# You are an intelligent math assistant designed to solve math problems that require careful reasoning.
-
-# When solving a math problem, you should:
-# 1. Break the problem down into steps
-# 2. Reason carefully through each step
-# 3. Provide a clear final answer in simplified form
-
-# Format your entire response using one these XML tags:
-# <reasoning>
-# Think step-by-step about how to solve the math problem, explaining the approach clearly.
-# </reasoning>
-# <answer>
-# Your final answer to the math problem, in simplified form.
-# </answer>
-
-# First use the <reasoning> tag to think through the problem. When you're ready to provide the final answer, use the <answer> tag.
-# """
-
-XML_COT_FORMAT = """
+XML_COT_FORMAT = """\
 <reasoning>
 {reasoning}
 </reasoning>
@@ -119,33 +104,34 @@ def extract_hash_answer(text: str) -> str | None:
         return None
     return text.split("####")[1].strip().replace(",", "").replace("$", "")
 
-# uncomment middle messages for 1-shot prompting
+# --- MODIFICATION: Updated prompt format for Gemma models ---
+# Gemma's chat template does not support the 'system' role.
+# System instructions are prepended to the user's first message.
 def get_gsm8k_questions(split = "train") -> Dataset:
     data = load_dataset('openai/gsm8k', 'main')[split] # type: ignore
-    data = data.map(lambda x: { # type: ignore
-        'prompt': [
-            {'role': 'system', 'content': SYSTEM_PROMPT},
-            #{'role': 'user', 'content': 'What is the largest single-digit prime number?'},
-            #{'role': 'assistant', 'content': XML_COT_FORMAT.format(
-            #    reasoning="9 is divisble by 3 and 8 is divisible by 2, but 7 is prime.",
-            #    answer="7"
-            #)},
-            {'role': 'user', 'content': x['question']}
-        ],
-        'answer': extract_hash_answer(x['answer'])
-    }) # type: ignore
+    def create_gemma_prompt(x):
+        # Combine system instructions and user question into a single user message
+        full_prompt = f"{SYSTEM_PROMPT.strip()}\n\n{x['question']}"
+        return {
+            'prompt': [{'role': 'user', 'content': full_prompt}],
+            'answer': extract_hash_answer(x['answer'])
+        }
+    data = data.map(create_gemma_prompt) # type: ignore
     return data # type: ignore
 
 dataset = get_gsm8k_questions()
 
-# Reward functions
+# Base Reward function (used by others)
 def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[float]:
     responses = [completion[0]['content'] for completion in completions]
-    q = prompts[0][-1]['content']
+    # For Gemma, the full prompt is in the first (and only) message
+    q = prompts[0][0]['content']
     extracted_responses = [extract_xml_answer(r) for r in responses]
     print('-'*20, f"Question:\n{q}", f"\nAnswer:\n{answer[0]}", f"\nResponse:\n{responses[0]}", f"\nExtracted:\n{extracted_responses[0]}")
+    # Return a larger reward for correctness to make its signal stronger
     return [2.0 if r == a else 0.0 for r, a in zip(extracted_responses, answer)]
 
+# Other shaping rewards
 def int_reward_func(completions, **kwargs) -> list[float]:
     responses = [completion[0]['content'] for completion in completions]
     extracted_responses = [extract_xml_answer(r) for r in responses]
@@ -155,16 +141,15 @@ def strict_format_reward_func(completions, **kwargs) -> list[float]:
     """Reward function that checks if the completion has a specific format."""
     pattern = r"^<reasoning>\n.*?\n</reasoning>\n<answer>\n.*?\n</answer>\n$"
     responses = [completion[0]["content"] for completion in completions]
-    matches = [re.match(pattern, r, flags=re.DOTALL) for r in responses] 
+    matches = [re.match(pattern, r, flags=re.DOTALL) for r in responses]
     return [0.5 if match else 0.0 for match in matches]
 
 def soft_format_reward_func(completions, **kwargs) -> list[float]:
     """Reward function that checks if the completion has a specific format."""
     pattern = r"<reasoning>.*?</reasoning>\s*<answer>.*?</answer>"
     responses = [completion[0]["content"] for completion in completions]
-    matches = [re.match(pattern, r, flags=re.DOTALL) for r in responses] 
+    matches = [re.match(pattern, r, flags=re.DOTALL) for r in responses]
     return [0.5 if match else 0.0 for match in matches]
-
 
 def xml_format_reward_func(completions, **kwargs) -> list[float]:
     """
@@ -177,7 +162,6 @@ def xml_format_reward_func(completions, **kwargs) -> list[float]:
     responses = [completion[0]["content"] for completion in completions]
     matches = [re.search(pattern, r, flags=re.DOTALL) for r in responses]
     return [0.5 if match else 0.0 for match in matches]
-
 
 def count_xml(text) -> float:
     count = 0.0
@@ -197,18 +181,57 @@ def xmlcount_reward_func(completions, **kwargs) -> list[float]:
     contents = [completion[0]["content"] for completion in completions]
     return [count_xml(c) for c in contents]
 
-#model_name = "meta-llama/Llama-3.2-1B-Instruct"
+
+# --- Define the necessary reward functions for discounting and evaluation ---
+
+def discounted_correctness_reward(
+    prompts, completions, answer, gamma: float, tokenizer, **kwargs
+) -> list[float]:
+    """Internal function to calculate the fully discounted reward."""
+    base_rewards = correctness_reward_func(prompts, completions, answer, **kwargs)
+    discounted_rewards = []
+    for i, completion in enumerate(completions):
+        base_reward = base_rewards[i]
+        if base_reward == 0.0:
+            discounted_rewards.append(0.0)
+            continue
+        completion_text = completion[0]['content']
+        num_tokens = len(tokenizer.encode(completion_text))
+        if num_tokens > 0:
+            discounted_reward = base_reward * (gamma ** (num_tokens - 1))
+        else:
+            discounted_reward = 0.0
+        discounted_rewards.append(discounted_reward)
+    return discounted_rewards
+
+
+
+def training_reward_adjustment(
+    prompts, completions, answer, gamma: float, tokenizer, **kwargs
+) -> list[float]:
+    """
+    Calculates the difference for TRAINING: (discounted_reward - undiscounted_reward).
+    When added to the undiscounted_reward, the total is the discounted_reward.
+    """
+    undiscounted_rewards = correctness_reward_func(prompts, completions, answer, **kwargs)
+    full_discounted_rewards = discounted_correctness_reward(
+        prompts, completions, answer, gamma, tokenizer, **kwargs
+    )
+    return [d - u for d, u in zip(full_discounted_rewards, undiscounted_rewards)]
+
+
+# --- Model and Training Configuration ---
+
 model_name = args.model_name
 seed=args.seed
 machine_name = args.machine_name
-
-
-#model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+GAMMA = args.gamma
 
 model_short_name = args.model_name.split("/")[-1]
-run_name = f"{model_short_name}-gsm8k-base-seed{args.seed}-{args.machine_name}"
+run_name = f"{model_short_name}-gsm8k-gamma{GAMMA}-seed{args.seed}-{args.machine_name}"
 output_dir = f"{args.output_dir}/{run_name}"
-    
+
+
 training_args = GRPOConfig(
     output_dir=output_dir,
     run_name=run_name,
@@ -245,30 +268,91 @@ model = AutoModelForCausalLM.from_pretrained(
     torch_dtype=torch.bfloat16,
     attn_implementation="flash_attention_2",
 )
+#model.gradient_checkpointing_enable()
 
 model.config.use_cache = False
 
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-tokenizer.pad_token = tokenizer.eos_token
 
-# use peft at your own risk; not working for me with multi-GPU training
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+# --- MODIFICATION: Set pad_token if it's not already set ---
+# Many models like Gemma do not have a pad_token by default.
+# Setting it to the eos_token is a common practice for autoregressive models.
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+
+
+# --- Configure the GRPOTrainer with the Correct Reward Functions ---
+
+
+# Create a partial function to pass the gamma and tokenizer to the adjustment function
+# This is necessary because the trainer only calls reward functions with a standard set of arguments.
+_partial_training_adjustment = partial(
+    training_reward_adjustment,
+    gamma=GAMMA,
+    tokenizer=tokenizer
+)
+
+# It's good practice to wrap the partial function to give it a clear __name__ for logging
+def training_adjustment_func(prompts, completions, answer, **kwargs):
+    """A wrapper to call the partial function, satisfying the GRPOTrainer's __name__ requirement."""
+    return _partial_training_adjustment(
+        prompts=prompts,
+        completions=completions,
+        answer=answer,
+        **kwargs
+    )
+training_adjustment_func.__name__ = "training_adjustment_func" # Explicitly set name
+
+
+# Initialize the trainer
 trainer = GRPOTrainer(
     model=model,
     processing_class=tokenizer,
     reward_funcs=[
+        # --- Shaping Rewards ---
+        # These guide the model towards the correct format and style.
         xmlcount_reward_func,
         soft_format_reward_func,
         strict_format_reward_func,
         int_reward_func,
+
+        # --- Correctness Rewards (The Additive Trick) ---
+        # The trainer sums all rewards. We provide two functions that, when added,
+        # result in the desired discounted reward for training, while allowing us
+        # to log the "true" undiscounted reward separately.
+
+        # 1. The Undiscounted Reward (for PLOTTING):
+        # This gives the "true" correctness score. The trainer will log this
+        # function's output, so you can plot `rewards/undiscounted_correctness_reward/mean`.
         correctness_reward_func,
-        ],
+
+        # 2. The Adjustment (for TRAINING):
+        # This function calculates: (Discounted Reward - Undiscounted Reward).
+        # When the trainer adds this to the function above, the undiscounted parts
+        # cancel out, leaving only the discounted reward in the final training signal.
+        training_adjustment_func,
+    ],
     args=training_args,
     train_dataset=dataset,
 )
-trainer.train()
 
-trainer.accelerator.wait_for_everyone()
-if trainer.accelerator.is_main_process:
-    trainer.save_model(output_dir + "/final")   # or your path
-    tokenizer.save_pretrained(output_dir + "/final")
-trainer.accelerator.wait_for_everyone()
+print(trainer.generation_config)  
+print("→ max_new_tokens:", trainer.generation_config.max_new_tokens)
+print("→ temperature:   ", trainer.generation_config.temperature)
+print("→ top_p:         ", trainer.generation_config.top_p)
+print("→ gamma:         ", GAMMA)
+print("→ ref_sync:      ", args.sync_ref_model)
+print("→ disable_dropout:      ", args.disable_dropout)
+print("→ warmup_ratio:        ", args.warmup_ratio)
+
+try:
+    trainer.train()
+finally:
+    trainer.save_model(output_dir + "/final")  
+
+
+# trainer.accelerator.wait_for_everyone()
+# if trainer.accelerator.is_main_process:
+#     trainer.save_model(output_dir + "/final")   # or your path
+#     tokenizer.save_pretrained(output_dir + "/final")
+# trainer.accelerator.wait_for_everyone()

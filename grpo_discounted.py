@@ -109,11 +109,6 @@ def get_gsm8k_questions(split = "train") -> Dataset:
     data = data.map(lambda x: { # type: ignore
         'prompt': [
             {'role': 'system', 'content': SYSTEM_PROMPT},
-            #{'role': 'user', 'content': 'What is the largest single-digit prime number?'},
-            #{'role': 'assistant', 'content': XML_COT_FORMAT.format(
-            #    reasoning="9 is divisble by 3 and 8 is divisible by 2, but 7 is prime.",
-            #    answer="7"
-            #)},
             {'role': 'user', 'content': x['question']}
         ],
         'answer': extract_hash_answer(x['answer'])
@@ -127,7 +122,7 @@ def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[floa
     responses = [completion[0]['content'] for completion in completions]
     q = prompts[0][-1]['content']
     extracted_responses = [extract_xml_answer(r) for r in responses]
-    #print('-'*20, f"Question:\n{q}", f"\nAnswer:\n{answer[0]}", f"\nResponse:\n{responses[0]}", f"\nExtracted:\n{extracted_responses[0]}")
+    print('-'*20, f"Question:\n{q}", f"\nAnswer:\n{answer[0]}", f"\nResponse:\n{responses[0]}", f"\nExtracted:\n{extracted_responses[0]}")
     # Return a larger reward for correctness to make its signal stronger
     return [2.0 if r == a else 0.0 for r, a in zip(extracted_responses, answer)]
 
@@ -339,6 +334,7 @@ print("→ top_p:         ", trainer.generation_config.top_p)
 print("→ gamma:         ", GAMMA)
 print("→ ref_sync:      ", args.sync_ref_model)
 print("→ disable_dropout:      ", args.disable_dropout)
+print("→ warmup_ratio:        ", args.warmup_ratio)
 
 try:
     trainer.train()
