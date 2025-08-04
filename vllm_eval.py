@@ -39,7 +39,7 @@ def extract_numerical_answer(answer_text):
     return None
 
 
-model_name = '/home/ubuntu/alex/verifiers/outputs/Qwen2.5-7B-Instruct-gsm8k-gamma0.99999975-seed43-5gen-1epoch-capacityblock1/checkpoint-935'
+model_name = '/home/ubuntu/alex/verifiers/outputs/Qwen2.5-1.5B-Instruct-gsm8k-gamma0.999999995-seed43-1epoch-capacityblock3/checkpoint-935'
 
 llm = LLM(
     model=model_name,
