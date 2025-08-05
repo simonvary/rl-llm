@@ -39,7 +39,7 @@ def extract_numerical_answer(answer_text):
     return None
 
 
-model_name = '/home/ubuntu/alex/verifiers/outputs/Qwen2.5-7B-Instruct-gsm8k-gamma0.99999975-seed43-5gen-1epoch-capacityblock1/checkpoint-935'
+model_name = '/data2/alex/verifiers/outputs_s3/outputs_capacityblock0/Qwen2.5-7B-Instruct-gsm8k-gamma0.99999975-seed44-constantlr-1epoch-capacityblock0/checkpoint-935'
 
 llm = LLM(
     model=model_name,
@@ -79,7 +79,7 @@ for i, item in enumerate(data):
 
 prompts = [item["prompt"] for item in eval_data]
 
-sampling_params = SamplingParams(temperature=0.0, max_tokens=786, stop=None)
+sampling_params = SamplingParams(temperature=0.0, top_p = 1.0, top_k = 0, max_tokens=786, seed = 42)
 outputs = llm.generate(prompts, sampling_params)
 
 
@@ -106,3 +106,4 @@ for output in outputs:
     response_lengths.append(num_tokens)
 
 print(sum(response_lengths) / len(response_lengths))
+
