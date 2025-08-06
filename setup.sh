@@ -18,10 +18,7 @@ conda activate "${ENV_NAME}"
 echo "[*] Activated conda env:  ${CONDA_PREFIX}"
 
 # 3) Make sure uv is available inside the env
-if ! command -v uv >/dev/null 2>&1; then
-  echo "[*] Installing the 'uv' package manager in the env ..."
-  pip install uv
-fi
+pip install uv
 
 # 4) Tell uv to use *this* env instead of creating .venv
 #    –Either export UV_PROJECT_ENVIRONMENT or rely on --active.
