@@ -64,8 +64,7 @@ def extract_numerical_answer(answer_text):
     return None
 
 
-#model_name = 'data2/alex/verifiers/outputs/Qwen2.5-0.5B-Instruct-gsm8k-gamma1.0-seed42-beta0.1-8steps-1epoch-193/checkpoint-935'  # Example model name, replace with your actual model path
-model_name = args.model_name
+model_name = 'data2/alex/verifiers/outputs/Qwen2.5-0.5B-Instruct-gsm8k-gamma1.0-seed42-beta0.1-8steps-1epoch-193/checkpoint-935'  # Example model name, replace with your actual model path
 
 llm = LLM(
     model=model_name,
