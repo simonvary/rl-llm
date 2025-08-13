@@ -14,7 +14,6 @@ from trl import GRPOConfig, GRPOTrainer
 import numpy as np
 from accelerate import Accelerator
 from functools import partial
-from math_verify import parse, verify
 
 # ----------------------------------------------------------------------------
 # Argument Parser
@@ -94,11 +93,6 @@ XML_COT_FORMAT = """\
 </answer>
 """
 
-def extract_xml_answer_verify(text: str) -> str:
-    answer = text.split("<answer>")[-1]
-    answer = answer.split("</answer>")[0]
-    return answer
-
 def extract_xml_answer(text: str) -> str:
     answer = text.split("<answer>")[-1]
     answer = answer.split("</answer>")[0]
@@ -127,10 +121,10 @@ dataset = get_gsm8k_questions()
 def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[float]:
     responses = [completion[0]['content'] for completion in completions]
     q = prompts[0][-1]['content']
-    extracted_responses = [extract_xml_answer_verify(r) for r in responses]
+    extracted_responses = [extract_xml_answer(r) for r in responses]
     print('-'*20, f"Question:\n{q}", f"\nAnswer:\n{answer[0]}", f"\nResponse:\n{responses[0]}", f"\nExtracted:\n{extracted_responses[0]}")
     # Return a larger reward for correctness to make its signal stronger
-    return [2.0 if verify(parse(r),parse(a)) == True else 0.0 for r, a in zip(extracted_responses, answer)]
+    return [2.0 if r == a else 0.0 for r, a in zip(extracted_responses, answer)]
 
 # Other shaping rewards
 def int_reward_func(completions, **kwargs) -> list[float]:
@@ -348,3 +342,8 @@ finally:
     trainer.save_model(output_dir + "/final")  
 
 
+# trainer.accelerator.wait_for_everyone()
+# if trainer.accelerator.is_main_process:
+#     trainer.save_model(output_dir + "/final")   # or your path
+#     tokenizer.save_pretrained(output_dir + "/final")
+# trainer.accelerator.wait_for_everyone()
