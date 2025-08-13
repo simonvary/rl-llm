@@ -28,6 +28,7 @@ docs/build/
 wandb/
 outputs/
 outputs_s3/
+eval_results/
 logs/
 
 # development
