@@ -1,0 +1,24 @@
+INFO 08-13 00:29:01 [__init__.py:235] Automatically detected platform cuda.
+INFO 08-13 00:29:09 [config.py:1604] Using max model len 1024
+INFO 08-13 00:29:09 [config.py:2434] Chunked prefill is enabled with max_num_batched_tokens=8192.
+INFO 08-13 00:29:10 [core.py:572] Waiting for init message from front-end.
+INFO 08-13 00:29:10 [core.py:71] Initializing a V1 LLM engine (v0.10.0) with config: model='/data2/alex/verifiers/outputs_s3/outputs_capacityblock1/Qwen/Qwen2.5-7B-Instruct-gsm8k-discount0.9999999-seed43constlr-1epoch-capacityblock1/checkpoint-935', speculative_config=None, tokenizer='/data2/alex/verifiers/outputs_s3/outputs_capacityblock1/Qwen/Qwen2.5-7B-Instruct-gsm8k-discount0.9999999-seed43constlr-1epoch-capacityblock1/checkpoint-935', skip_tokenizer_init=False, tokenizer_mode=auto, revision=None, override_neuron_config={}, tokenizer_revision=None, trust_remote_code=True, dtype=torch.bfloat16, max_seq_len=1024, download_dir=None, load_format=LoadFormat.AUTO, tensor_parallel_size=1, pipeline_parallel_size=1, disable_custom_all_reduce=False, quantization=None, enforce_eager=False, kv_cache_dtype=auto,  device_config=cuda, decoding_config=DecodingConfig(backend='auto', disable_fallback=False, disable_any_whitespace=False, disable_additional_properties=False, reasoning_backend=''), observability_config=ObservabilityConfig(show_hidden_metrics_for_version=None, otlp_traces_endpoint=None, collect_detailed_traces=None), seed=0, served_model_name=/data2/alex/verifiers/outputs_s3/outputs_capacityblock1/Qwen/Qwen2.5-7B-Instruct-gsm8k-discount0.9999999-seed43constlr-1epoch-capacityblock1/checkpoint-935, num_scheduler_steps=1, multi_step_stream_outputs=True, enable_prefix_caching=True, chunked_prefill_enabled=True, use_async_output_proc=True, pooler_config=None, compilation_config={"level":3,"debug_dump_path":"","cache_dir":"","backend":"","custom_ops":[],"splitting_ops":["vllm.unified_attention","vllm.unified_attention_with_output","vllm.mamba_mixer2"],"use_inductor":true,"compile_sizes":[],"inductor_compile_config":{"enable_auto_functionalized_v2":false},"inductor_passes":{},"use_cudagraph":true,"cudagraph_num_of_warmups":1,"cudagraph_capture_sizes":[512,504,496,488,480,472,464,456,448,440,432,424,416,408,400,392,384,376,368,360,352,344,336,328,320,312,304,296,288,280,272,264,256,248,240,232,224,216,208,200,192,184,176,168,160,152,144,136,128,120,112,104,96,88,80,72,64,56,48,40,32,24,16,8,4,2,1],"cudagraph_copy_inputs":false,"full_cuda_graph":false,"max_capture_size":512,"local_cache_dir":null}
+INFO 08-13 00:29:13 [parallel_state.py:1102] rank 0 in world size 1 is assigned as DP rank 0, PP rank 0, TP rank 0, EP rank 0
+WARNING 08-13 00:29:13 [topk_topp_sampler.py:59] FlashInfer is not available. Falling back to the PyTorch-native implementation of top-p & top-k sampling. For the best performance, please install FlashInfer.
+INFO 08-13 00:29:14 [gpu_model_runner.py:1843] Starting to load model /data2/alex/verifiers/outputs_s3/outputs_capacityblock1/Qwen/Qwen2.5-7B-Instruct-gsm8k-discount0.9999999-seed43constlr-1epoch-capacityblock1/checkpoint-935...
+INFO 08-13 00:29:14 [gpu_model_runner.py:1875] Loading model from scratch...
+INFO 08-13 00:29:14 [cuda.py:290] Using Flash Attention backend on V1 engine.
+INFO 08-13 00:29:18 [default_loader.py:262] Loading weights took 4.45 seconds
+INFO 08-13 00:29:19 [gpu_model_runner.py:1892] Model loading took 14.2488 GiB and 4.645313 seconds
+INFO 08-13 00:29:26 [backends.py:530] Using cache directory: /home/ubuntu/.cache/vllm/torch_compile_cache/0c2b7de760/rank_0_0/backbone for vLLM's torch.compile
+INFO 08-13 00:29:26 [backends.py:541] Dynamo bytecode transform time: 7.15 s
+INFO 08-13 00:29:32 [backends.py:161] Directly load the compiled graph(s) for dynamic shape from the cache, took 5.354 s
+INFO 08-13 00:29:35 [monitor.py:34] torch.compile takes 7.15 s in total
+INFO 08-13 00:29:36 [gpu_worker.py:255] Available KV cache memory: 21.81 GiB
+INFO 08-13 00:29:37 [kv_cache_utils.py:833] GPU KV cache size: 408,336 tokens
+INFO 08-13 00:29:37 [kv_cache_utils.py:837] Maximum concurrency for 1,024 tokens per request: 398.77x
+INFO 08-13 00:29:40 [gpu_model_runner.py:2485] Graph capturing finished in 3 secs, took 0.50 GiB
+INFO 08-13 00:29:40 [core.py:193] init engine (profile, create kv cache, warmup model) took 20.79 seconds
+Model: /data2/alex/verifiers/outputs_s3/outputs_capacityblock1/Qwen/Qwen2.5-7B-Instruct-gsm8k-discount0.9999999-seed43constlr-1epoch-capacityblock1/checkpoint-935
+Mean Correct: 0.915870609047258
+Mean Length: 168.5917867071013
