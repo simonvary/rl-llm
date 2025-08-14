@@ -6,16 +6,11 @@ ENV_NAME="alex"        # name of the conda env to create/use
 PY_VERSION="3.11"      # Python version to install in that env
 # --------------------------------
 
-# 1) Create the env if it doesn't exist yet
-if ! conda env list | awk '{print $1}' | grep -qx "${ENV_NAME}"; then
-  echo "[*] Creating conda env '${ENV_NAME}' (Python ${PY_VERSION}) ..."
-  conda create -y -n "${ENV_NAME}" "python=${PY_VERSION}"
-fi
+conda create -n "${ENV_NAME}" "python=${PY_VERSION}"
 
-# 2) Activate it (load conda helpers first in case this runs inside a script)
-source "$(conda info --base)/etc/profile.d/conda.sh"
+
 conda activate "${ENV_NAME}"
-echo "[*] Activated conda env:  ${CONDA_PREFIX}"
+
 
 # 3) Make sure uv is available inside the env
 pip install uv
@@ -25,7 +20,8 @@ pip install uv
 export UV_PROJECT_ENVIRONMENT="${CONDA_PREFIX}"
 
 echo "[*] Running 'uv sync --extra all' in the active conda env ..."
-cd /data2/alex/verifiers
+git clone https://github.com/willccbb/verifiers.git
+cd verifiers/
 uv sync --extra all --active    # --active forces uv to respect the active env :contentReference[oaicite:0]{index=0}
 
 uv pip uninstall torch torchaudio torchvision flash-attn
@@ -45,4 +41,7 @@ python -c "import flash_attn; print('Flash Attention imported successfully')"
 uv pip uninstall vllm
 
 uv pip install vllm --no-build-isolation
+
+cd ..
+rm -rf verifiers/
 
