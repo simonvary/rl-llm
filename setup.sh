@@ -46,6 +46,3 @@ uv pip uninstall vllm
 
 uv pip install vllm --no-build-isolation
 
-uv pip uninstall transformers
-
-uv pip install "transformers==4.55.0"
