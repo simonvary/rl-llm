@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mkdir install
-cd install/
+
 
 # -------- configuration --------
 ENV_NAME="alex"        # name of the conda env to create/use
@@ -11,7 +10,7 @@ PY_VERSION="3.11"      # Python version to install in that env
 
 conda create -n "${ENV_NAME}" "python=${PY_VERSION}"
 
-
+conda init
 conda activate "${ENV_NAME}"
 
 
@@ -47,6 +46,5 @@ uv pip install vllm --no-build-isolation
 
 cd ..
 rm -rf verifiers/
-cd ..
-rm -rf install/
+
 
