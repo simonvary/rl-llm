@@ -47,7 +47,7 @@ def get_args():
     parser.add_argument("--shuffle_dataset", action='store_true', help="Shuffle the dataset")
 
     # Training Hyperparameters
-    parser.add_argument("--learning_rate", type=float, default=2.5e-6, help="The learning rate for the AdamW optimizer.")
+    parser.add_argument("--learning_rate", type=float, default=1e-6, help="The learning rate for the AdamW optimizer.")
     parser.add_argument("--gamma", type=float, default=1-1e-7, help="The discount factor for controlling lengths of completions in the GRPO loss.")
     parser.add_argument("--beta", type=float, default=0.4, help="The beta parameter for the GRPO loss.")
     parser.add_argument("--num_train_epochs", type=int, default=1, help="Total number of training epochs.")
@@ -130,15 +130,19 @@ dataset = get_math_questions()
 dataset = dataset.shuffle(seed=args.seed).select(range(7000))
 
 
+
+
 # Base Reward function (used by others)
 def correctness_reward_func(prompts, completions, answer, **kwargs) -> list[float]:
     responses = [completion[0]['content'] for completion in completions]
     q = prompts[0][-1]['content']
     extracted_responses = [extract_xml_answer(r) for r in responses]
     print('-'*20, f"Question:\n{q}", f"\nAnswer:\n{answer[0]}", f"\nResponse:\n{responses[0]}", f"\nExtracted:\n{extracted_responses[0]}")
+    # Return a larger reward for correctness to make its signal stronger
     return [2.0 if verify(parse(r),parse(a)) == True else 0.0 for r, a in zip(extracted_responses, answer)]
 
 def strict_format_reward_func(completions, **kwargs) -> list[float]:
+    """Reward function that checks if the completion has a specific format."""
     pattern = r"^<reasoning>\n.*?\n</reasoning>\n<answer>\n.*?\n</answer>\n$"
     responses = [completion[0]["content"] for completion in completions]
     matches = [re.match(pattern, r, flags=re.DOTALL) for r in responses]
@@ -150,12 +154,19 @@ def answer_length_reward(prompts, completions, answer, **kwargs) -> list[float]:
     return [0.5 if len(r) < args.max_answer_length and len(r) > 0 and GAMMA * args.answer_reward_scale < 1 else 0.0 for r in extracted_responses]
 
 def soft_format_reward_func(completions, **kwargs) -> list[float]:
+    """Reward function that checks if the completion has a specific format."""
     pattern = r"<reasoning>.*?</reasoning>\s*<answer>.*?</answer>"
     responses = [completion[0]["content"] for completion in completions]
     matches = [re.match(pattern, r, flags=re.DOTALL) for r in responses]
     return [0.5 if match else 0.0 for match in matches]
 
 def xml_format_reward_func(completions, **kwargs) -> list[float]:
+    """
+    Reward 0.1 if the completion contains:
+      <reasoning> ... </reasoning>
+      <answer>   ... </answer>
+    (in that order, allowing any content/newlines in between).
+    """
     pattern = r"<reasoning>.*?</reasoning>\s*<answer>.*?</answer>"
     responses = [completion[0]["content"] for completion in completions]
     matches = [re.search(pattern, r, flags=re.DOTALL) for r in responses]
@@ -180,44 +191,109 @@ def xmlcount_reward_func(completions, **kwargs) -> list[float]:
     return [count_xml(c) for c in contents]
 
 
-# --- Discounting helpers ---
+# --- Define the necessary reward functions for discounting and evaluation ---
 
+# --- Define the necessary reward functions for discounting and evaluation ---
+
+# Captures ONLY the text inside <reasoning>...</reasoning> and excludes the
+# required leading/trailing newlines mandated by strict_format_reward_func.
 RE_REASONING_CONTENT = re.compile(
     r"<reasoning>[^\S\n]*\n(.*?)\n[^\S\n]*</reasoning>",
     re.DOTALL,
 )
 
 def discountable_text(content: str, ignore_newlines: bool = True) -> str:
+    """
+    Only returns text inside <reasoning>...</reasoning>.
+    With ignore_newlines=False, every internal newline is preserved and counted
+    (except the single required newline after <reasoning> and before </reasoning>).
+    """
     text = content.replace("\r\n", "\n").replace("\r", "\n")
     parts = RE_REASONING_CONTENT.findall(text)
     if not parts:
         return ""
     reasoning_text = "\n\n".join(parts)
     if ignore_newlines:
+        # Collapse all whitespace to single spaces for length-based discounting
         return re.sub(r"\s+", " ", reasoning_text).strip()
     else:
+        # Preserve internal whitespace exactly
         return reasoning_text
+
+
+
+# # Remove entire <answer>...</answer> blocks (ignore their inner text)
+# RE_ANSWER_BLOCK = re.compile(r"<answer>\s*.*?\s*</answer>", re.IGNORECASE | re.DOTALL)
+# # Strip XML tags themselves (but keep their inner text if any remains)
+# RE_XML_TAGS = re.compile(r"</?(?:reasoning|answer)\s*>", re.IGNORECASE)
+
+# def discountable_text(content: str, ignore_newlines: bool = True) -> str:
+#     """
+#     Text to count for discounting:
+#       - Drop <answer>...</answer> (and its contents).
+#       - Remove <reasoning>/<answer> tags themselves.
+#       - Optionally ignore newlines (default True).
+#     Everything else remains and is counted.
+#     """
+#     # Normalize newlines first
+#     text = content.replace("\r\n", "\n").replace("\r", "\n")
+
+#     # 1) Remove the entire answer block(s)
+#     text = RE_ANSWER_BLOCK.sub("", text)
+
+#     # 2) Remove the tags themselves
+#     text = RE_XML_TAGS.sub("", text)
+
+#     # 3) Ignore newlines for discounting
+#     if ignore_newlines:
+#         # Replace runs of optional spaces + newline + optional spaces with a single space
+#         text = re.sub(r"\s*\n\s*", " ", text)
+#         # Clean up any excessive spacing at the ends
+#         text = text.strip()
+
+#     return text
 
 def discounted_correctness_reward(
     prompts, completions, answer, gamma: float, tokenizer, **kwargs
 ) -> list[float]:
+    """
+    Discount using tokens from everything outside <answer>...</answer>,
+    excluding the XML tags themselves and (by default) NEWLINES.
+    """
     base_rewards = correctness_reward_func(prompts, completions, answer, **kwargs)
     out = []
+
     for i, completion in enumerate(completions):
         base = base_rewards[i]
         if base == 0.0:
             out.append(0.0)
             continue
+
         completion_text = completion[0]["content"]
+
+        # Get only the discountable text per your rules
         countable = discountable_text(completion_text, ignore_newlines=False)
+
+        # Tokenize and compute discount
         n_tokens = len(tokenizer.encode(countable))
+
+        # If nothing to count (e.g., model only returned a clean <answer> block),
+        # don't penalize formatting: exponent 0 -> gamma**0 == 1
         k = max(n_tokens, 1)
         out.append(base * (gamma ** (k - 1)))
+
     return out
+
+
+
 
 def training_reward_adjustment(
     prompts, completions, answer, gamma: float, tokenizer, **kwargs
 ) -> list[float]:
+    """
+    Calculates the difference for TRAINING: (discounted_reward - undiscounted_reward).
+    When added to the undiscounted_reward, the total is the discounted_reward.
+    """
     undiscounted_rewards = correctness_reward_func(prompts, completions, answer, **kwargs)
     full_discounted_rewards = discounted_correctness_reward(
         prompts, completions, answer, gamma, tokenizer, **kwargs
