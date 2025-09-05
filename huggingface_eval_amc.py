@@ -5,31 +5,8 @@ from transformers import AutoTokenizer
 from vllm import LLM, SamplingParams
 from tqdm import tqdm
 from math_verify import parse, verify
-
-
-
-
-# ----------------------------------------------------------------------------
-# Argument Parser
-# ----------------------------------------------------------------------------
-def get_args():
-    """Parses command-line arguments."""
-    parser = argparse.ArgumentParser(description="Train a model using GRPOTrainer with configurable arguments.")
-
-    # Model and Tokenizer
-    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-7B-Instruct", help="The name of the model to evaluate.")
-    parser.add_argument("--runs", type=int, default=30, help="Number of runs to average the results over.")
-    parser.add_argument("--max_model_len", type=int, default=3072, help="Maximum model length.")
-    parser.add_argument("--temperature", type=float, default=0.6, help="Sampling temperature for generation.")
-    parser.add_argument("--top_p", type=float, default=1.0, help="Top-p sampling parameter.")
-    parser.add_argument("--top_k", default=-1, help="Top-k sampling parameter.")
-    parser.add_argument("--max_tokens", type=int, default=2048, help="Maximum number of tokens to generate in each response.")
-    parser.add_argument("--seed", type=int, default=42, help="The seed used during vllm's inference")
-
-
-    return parser.parse_args()
-args = get_args()
-
+import multiprocessing as mp
+import os
 
 SYSTEM_PROMPT = """You must reply in EXACTLY this XML:
 
@@ -44,13 +21,25 @@ Rules:
 - All text must be wrapped inside a <reasoning> </reasoning> or <answer> </answer> tag. 
 """
 
-
+# ----------------------------------------------------------------------------
+# Helpers
+# ----------------------------------------------------------------------------
+def get_args():
+    parser = argparse.ArgumentParser(description="Evaluate a model on AIME25 with vLLM.")
+    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-7B-Instruct")
+    parser.add_argument("--runs", type=int, default=30)
+    parser.add_argument("--max_model_len", type=int, default=3072)
+    parser.add_argument("--temperature", type=float, default=0.6)
+    parser.add_argument("--top_p", type=float, default=1.0)
+    parser.add_argument("--top_k", default=-1)
+    parser.add_argument("--max_tokens", type=int, default=2048)
+    parser.add_argument("--seed", type=int, default=42)
+    return parser.parse_args()
 
 def extract_xml_answer(text: str) -> str:
     m = re.search(r"<answer>\s*(.*?)\s*</answer>", text, flags=re.DOTALL)
     if m:
         return m.group(1).strip()
-    # Fallback: if stop stripped the closing tag, take until EOS
     m = re.search(r"<answer>\s*(.*)$", text, flags=re.DOTALL)
     return m.group(1).strip() if m else ""
 
@@ -60,92 +49,102 @@ def extract_hash_answer(text: str) -> str | None:
     return text.split("####")[1].strip().replace(",", "").replace("$", "")
 
 def extract_numerical_answer(answer_text):
-    # GSM8K answers end with #### followed by the numerical answer
     match = re.search(r"#### ([-\d,]+)", answer_text)
     if match:
-        # Remove commas and convert to int
         return int(match.group(1).replace(",", ""))
     return None
 
+def main():
+    args = get_args()
 
-#model_name = 'data2/alex/verifiers/outputs/Qwen2.5-0.5B-Instruct-gsm8k-gamma1.0-seed42-beta0.1-8steps-1epoch-193/checkpoint-935'  # Example model name, replace with your actual model path
-model_name = args.model_name
-BASE_TOKENIZER_ID = "microsoft/phi-4"
+    # vLLM sometimes emits tokenizer parallelism warnings; silence if you like
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
-llm = LLM(
-    model=model_name,
-    tokenizer=BASE_TOKENIZER_ID,
-    tensor_parallel_size=1,
-    dtype="auto",
-    trust_remote_code=True,
-    max_model_len=args.max_model_len,
-    gpu_memory_utilization=0.95,
-    enforce_eager=False,  # Use Flash Attention 2
-)
+    # Base tokenizer (only for vLLM's internal tokenizer if you need to override)
+    BASE_TOKENIZER_ID = "microsoft/phi-4"
 
-data = load_dataset("math-ai/amc23")['test']
-tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-eval_data = []
-for i, item in enumerate(data):
-    # Create the chat structure, same as in training
-    chat = [
-        {'role': 'system', 'content': SYSTEM_PROMPT},
-        {'role': 'user', 'content': item["question"]},
-    ]
-    
-    # Apply the template to get the correctly formatted prompt string
-    formatted_prompt = tokenizer.apply_chat_template(
-        chat,
-        tokenize=False,
-        add_generation_prompt=True # Adds the prompt for the assistant's turn
+    # Normalize top_k: vLLM expects int or None, not -1
+    top_k = args.top_k
+
+    # Build the engine INSIDE main / after spawn method is set
+    llm = LLM(
+        model=args.model_name,
+        tokenizer=BASE_TOKENIZER_ID,
+        tensor_parallel_size=1,
+        dtype="auto",               # OK: avoids the deprecated torch_dtype kw
+        # trust_remote_code only matters for custom model code; okay to keep here
+        trust_remote_code=True,
+        max_model_len=args.max_model_len,
+        gpu_memory_utilization=0.95,
+        enforce_eager=False,        # use FA2 if available
     )
-    
-    proccessed = {
-        "question": item["question"],
-        "prompt": formatted_prompt, # Use the correctly formatted prompt
-        "answer": item["answer"],
-        "numerical_answer": item["answer"],
-        "other_answer": item["answer"],
-    }
-    eval_data.append(proccessed)
 
-prompts = [item["prompt"] for item in eval_data]
+    # Use the model repo’s tokenizer to format chat prompts correctly
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name, trust_remote_code=True)
 
+    # Prepare data
+    data = load_dataset("math-ai/amc23")["test"]
+    eval_data = []
+    for item in data:
+        chat = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": item["question"]},
+        ]
+        formatted_prompt = tokenizer.apply_chat_template(
+            chat,
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+        eval_data.append({
+            "question": item["question"],
+            "prompt": formatted_prompt,
+            "answer": item["answer"],
+            "numerical_answer": item["answer"],
+            "other_answer": item["answer"],
+        })
 
+    prompts = [it["prompt"] for it in eval_data]
 
+    sampling_params = SamplingParams(
+        temperature=args.temperature,
+        top_p=args.top_p,
+        top_k=top_k,
+        max_tokens=args.max_tokens,
+        seed=args.seed,
+        stop=["</answer>"],
+    )
 
-sampling_params = SamplingParams(temperature=args.temperature, top_p = args.top_p, top_k=args.top_k, max_tokens=args.max_tokens, seed = args.seed,stop=["</answer>"])
-runs = args.runs
-mean_correct = 0
-mean_length = 0
-for run in tqdm(range(runs)):
+    runs = args.runs
+    mean_correct = 0.0
+    mean_length = 0.0
 
-    outputs = llm.generate(prompts, sampling_params)
+    for run in tqdm(range(runs)):
+        outputs = llm.generate(prompts, sampling_params)
 
+        correct = 0
+        for i, output in enumerate(outputs):
+            generated_text = output.outputs[0].text
+            answer = parse(extract_xml_answer(generated_text))
+            gold = parse(eval_data[i]["other_answer"])
+            if verify(gold, answer):
+                correct += 1
+        mean_correct += correct / (i + 1)
 
-    correct = 0
-    for i, output in enumerate(outputs):
-        generated_text = output.outputs[0].text
-        answer = parse(extract_xml_answer(generated_text))
-        gold = parse(eval_data[i]["other_answer"])
-        if verify(gold,answer):
-            correct += 1
-    mean_correct += correct / (i+1)
+        response_lengths = []
+        for output in outputs:
+            first_completion = output.outputs[0]
+            num_tokens = len(first_completion.token_ids)
+            response_lengths.append(num_tokens)
+        mean_length += sum(response_lengths) / len(response_lengths)
 
-    response_lengths = []
-    for output in outputs:
-        # Get the first completion for the prompt
-        first_completion = output.outputs[0]
+    print("Model:", args.model_name)
+    print("Mean Correct:", mean_correct / runs)
+    print("Mean Length:", mean_length / runs)
 
-        # Get the number of tokens in this completion
-        num_tokens = len(first_completion.token_ids)
-
-        # Add it to our list
-        response_lengths.append(num_tokens)
-
-    #print(sum(response_lengths) / len(response_lengths))
-    mean_length += sum(response_lengths) / len(response_lengths)
-
-print("Model:", model_name)
-print("Mean Correct:", mean_correct / runs)
-print("Mean Length:", mean_length / runs)
+if __name__ == "__main__":
+    # Ensure the same start method everywhere; vLLM may internally rely on spawn.
+    try:
+        mp.set_start_method("spawn", force=True)
+    except RuntimeError:
+        pass
+    main()
