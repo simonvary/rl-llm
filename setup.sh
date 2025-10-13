@@ -2,18 +2,6 @@
 set -euo pipefail
 
 
-
-# -------- configuration --------
-ENV_NAME="alex"        # name of the conda env to create/use
-PY_VERSION="3.11"      # Python version to install in that env
-# --------------------------------
-
-conda create -n "${ENV_NAME}" "python=${PY_VERSION}"
-
-conda init
-conda activate "${ENV_NAME}"
-
-
 # 3) Make sure uv is available inside the env
 pip install uv
 
