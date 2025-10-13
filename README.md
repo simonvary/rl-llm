@@ -68,3 +68,7 @@ If you have only **one GPU**, you cannot run the vLLM server and the training sc
 2.  Locate the `GRPOConfig` arguments.
 3.  Set `use_vllm = False`.
 4.  Comment out the `generation_kwargs` line directly below it.
+
+## 📬 Contact
+
+For any questions or suggestions, please feel free to reach out at [aayoub@ualberta.ca](mailto:aayoub@ualberta.ca).
