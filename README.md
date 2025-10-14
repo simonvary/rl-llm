@@ -55,10 +55,19 @@ In a separate terminal (with the `grpo_env` still active), run the training scri
 CUDA_VISIBLE_DEVICES=1,2,... python train_gsm8k.py
 ```
 
-You can replace `train_gsm8k.py` with `train_XXX.py` to run the other training script (different dataset/models).
+You can replace `train_gsm8k.py` with `train_XXX.py` to run the other training script (different dataset/models). For some examples, see the bash scripts inside the run_scripts/ directory. 
 
 ---
 
+### 3. Run the Evaluation Script
+
+To evaluate the previous trained model simply run 
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python huggingface_eval.py --model_dir PATH_TO_MODEL
+```
+
+When running the evaluation script, make sure you match the specifics of the evaluation script to that of the training script. Make sure things like the system prompt and max generation length are consistent across the scripts. For some examples see the bash scripts in the eval_scripts/ directory
 
 ### Single GPU Usage
 
