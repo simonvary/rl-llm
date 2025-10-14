@@ -1,7 +1,4 @@
-Of course. Here is the raw markdown source for you to copy and paste.
-
-````markdown
-# GRPO Mathematical Reasoning Training
+# Readme
 
 This repository contains scripts for training language models on mathematical reasoning tasks like GSM8K and MATH, using Generative Rejection-based Policy Optimization (GRPO).
 
@@ -26,9 +23,9 @@ First, you need to create a new conda environment with Python 3.11 and activate 
 ```bash
 conda create -n grpo_env python=3.11
 conda activate grpo_env
-````
+```
 
-### 2\. Run the Setup Script
+### 2. Run the Setup Script
 
 Once the environment is active, run the provided setup script to install all the necessary dependencies.
 
@@ -36,13 +33,13 @@ Once the environment is active, run the provided setup script to install all the
 bash setup.sh
 ```
 
------
+---
 
-## ▶️ Training
+## ▶️ How to Run
 
 Running the training process involves two main steps: starting the vLLM inference server and then launching the training script.
 
-### 1\. Start the vLLM Server
+### 1. Start the vLLM Server
 
 In a new terminal, run the following command to start the vLLM server. This will host the `Qwen/Qwen2.5-7B-Instruct` model on **GPU 0**.
 
@@ -50,17 +47,29 @@ In a new terminal, run the following command to start the vLLM server. This will
 CUDA_VISIBLE_DEVICES=0 trl vllm-serve --model Qwen/Qwen2.5-7B-Instruct --tensor-parallel-size 1 --data-parallel-size 1
 ```
 
-### 2\. Run the Training Script
+### 2. Run the Training Script
 
-In a separate terminal (with the `grpo_env` still active), run the training script. This example uses `train_gsm8k.py` and assigns the training process to the remaining GPUs.
+In a separate terminal (with the `grpo_env` still active), run the training script. This example uses `train_gsm8k.py` and assigns the training process to the remaining GPUS.
 
 ```bash
 CUDA_VISIBLE_DEVICES=1,2,... python train_gsm8k.py
 ```
 
-You can replace `train_gsm8k.py` with other scripts (e.g., `train_math.py`) to train on different datasets or with different models. For more examples, see the bash scripts inside the `run_scripts/` directory.
+You can replace `train_gsm8k.py` with `train_XXX.py` to run the other training script (different dataset/models). For some examples, see the bash scripts inside the run_scripts/ directory. 
 
-### Single-GPU Usage
+---
+
+### 3. Run the Evaluation Script
+
+To evaluate the previous trained model simply run 
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python huggingface_eval.py --model_dir PATH_TO_MODEL
+```
+
+When running the evaluation script, make sure you match the specifics of the evaluation script to that of the training script. Make sure things like the system prompt and max generation length are consistent across the scripts. For some examples see the bash scripts in the eval_scripts/ directory
+
+### Single GPU Usage
 
 If you have only **one GPU**, you cannot run the vLLM server and the training script simultaneously. You must disable the vLLM-based generation in the script.
 
@@ -69,23 +78,6 @@ If you have only **one GPU**, you cannot run the vLLM server and the training sc
 3.  Set `use_vllm = False`.
 4.  Comment out the `generation_kwargs` line directly below it.
 
------
-
-## 📈 Evaluation
-
-To evaluate a previously trained model, run the `huggingface_eval.py` script.
-
-```bash
-CUDA_VISIBLE_DEVICES=0 python huggingface_eval.py --model_dir /path/to/your/model
-```
-
-**Note:** For an accurate and consistent evaluation, ensure the parameters in the evaluation script (e.g., system prompt, max generation length) match those used during training. You can find example evaluation configurations in the `eval_scripts/` directory.
-
------
-
 ## 📬 Contact
 
 For any questions or suggestions, please feel free to reach out at [aayoub@ualberta.ca](mailto:aayoub@ualberta.ca).
-
-```
-```
