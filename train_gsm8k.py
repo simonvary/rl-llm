@@ -9,6 +9,7 @@ import torch
 import argparse
 from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
+
 from trl import GRPOConfig, GRPOTrainer
 import numpy as np
 from accelerate import Accelerator
@@ -24,8 +25,11 @@ def get_args():
     parser = argparse.ArgumentParser(description="Train a model using GRPOTrainer with configurable arguments.")
 
     # Model and Tokenizer
-    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-7B-Instruct", help="The name of the base model to use from Hugging Face Hub.")
+    parser.add_argument("--model_name", type=str, default="Qwen/Qwen2.5-1.5B-Instruct", help="The name of the base model to use from Hugging Face Hub.")
     parser.add_argument("--attn_implementation", type=str, default="flash_attention_2", help="Attention implementation (e.g., 'flash_attention_2'). Use 'eager' for non-flash attention.")
+    parser.add_argument("--window_size", type=int, default=None, help="Sliding window size (tokens) to keep in KV cache (excluding sink).")
+    parser.add_argument("--enable_sink_attention", action="store_true", help="Enable sink attention (pins the first S tokens and uses a sliding window for the rest).")
+    parser.add_argument("--sink_tokens", type=int, default=8, help="Number of initial tokens to pin in the KV cache.")
 
     # Dataset
     parser.add_argument("--dataset_name", type=str, default="openai/gsm8k", help="The name of the dataset to use.")
@@ -65,7 +69,7 @@ def get_args():
 
     # Logging and Saving
     parser.add_argument("--logging_steps", type=int, default=1, help="Log every N steps.")
-    parser.add_argument("--save_steps", type=int, default=400, help="Save a checkpoint every N steps.")
+    parser.add_argument("--save_steps", type=int, default=200, help="Save a checkpoint every N steps.")
     return parser.parse_args()
 args = get_args()
 
@@ -104,6 +108,7 @@ def extract_xml_answer(text: str) -> str:
 
 def get_gsm8k_questions(split = "train") -> Dataset:
     data = load_dataset('openai/gsm8k', 'main')[split] # type: ignore
+    data = data.shuffle(seed=args.seed)  # <-- Add this line
     data = data.map(lambda x: { # type: ignore
         'prompt': [
             {'role': 'system', 'content': SYSTEM_PROMPT},
@@ -263,6 +268,24 @@ run_name = f"{model_short_name}-gsm8k-gamma{GAMMA}-seed{args.seed}-{args.machine
 output_dir = f"{args.output_dir}/{run_name}"
 
 
+gen_kwargs = {
+    "do_sample": True,
+    "temperature": args.temperature,
+    "top_p": 1.0,
+    #"top_k": -1, # Not sure why this does not work anymore
+    "max_new_tokens": args.max_completion_length
+}
+
+# Add sliding window / sink attention if specified
+if args.enable_sink_attention:
+    gen_kwargs.update({
+        "custom_generate": "transformers-community/sink_cache",
+        "trust_remote_code": True,
+        "window_length": args.window_size,
+        "num_sink_tokens": args.sink_tokens,
+    })
+
+
 training_args = GRPOConfig(
     output_dir=output_dir,
     run_name=run_name,
@@ -291,25 +314,20 @@ training_args = GRPOConfig(
     sync_ref_model=args.sync_ref_model,
     ref_model_sync_steps=args.ref_model_sync_steps,
     temperature=args.temperature,
-    use_vllm=True,
-    generation_kwargs={
-        "top_k": -1,
-        "temperature": args.temperature,
-        "top_p": 1,
-        "seed": args.seed,
-        "max_tokens": args.max_completion_length,
-    },
+    use_vllm=False,
+    # Wire up HF generation kwargs (TRL will pass these to model.generate)
+    generation_kwargs=gen_kwargs,
     #ddp_find_unused_parameters=False,
 )
 
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     torch_dtype=torch.bfloat16,
-    attn_implementation=args.attn_implementation,
+    attn_implementation=args.attn_implementation
 )
 #model.gradient_checkpointing_enable()
 
-model.config.use_cache = False
+model.config.use_cache = False  # training forward passes (GRPO) stay cache-free
 
 
 tokenizer = AutoTokenizer.from_pretrained(model_name)
