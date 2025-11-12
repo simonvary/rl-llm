@@ -37,14 +37,14 @@ def get_args():
 
     # Training Hyperparameters
     parser.add_argument("--learning_rate", type=float, default=5e-6, help="The learning rate for the AdamW optimizer.")
-    parser.add_argument("--gamma", type=float, default=1-1e-7, help="The discount factor for controlling lengths of completions in the GRPO loss.")
-    parser.add_argument("--beta", type=float, default=0.4, help="The beta parameter for the GRPO loss.")
+    parser.add_argument("--gamma", type=float, default=1, help="The discount factor for controlling lengths of completions in the GRPO loss.")
+    parser.add_argument("--beta", type=float, default=0.1, help="The beta parameter for the GRPO loss.")
     parser.add_argument("--num_train_epochs", type=int, default=1, help="Total number of training epochs.")
-    parser.add_argument("--per_device_train_batch_size", type=int, default=1, help="Training batch size per device.")
+    parser.add_argument("--per_device_train_batch_size", type=int, default=4, help="Training batch size per device.")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4, help="Number of steps for gradient accumulation.")
     parser.add_argument("--warmup_ratio", type=float, default=0.1, help="Warmup ratio for the learning rate scheduler.")
     parser.add_argument("--lr_scheduler_type", type=str, default="constant_with_warmup", help="Learning rate scheduler type.")
-    parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay for the optimizer.")
+    parser.add_argument("--weight_decay", type=float, default=0.1, help="Weight decay for the optimizer.")
     parser.add_argument("--max_grad_norm", type=float, default=0.1, help="Maximum gradient norm for clipping.")
     parser.add_argument("--temperature", type=float, default=1.0, help="Generation temperature for sampling.")
 
@@ -56,8 +56,8 @@ def get_args():
 
 
     # Generation Lengths
-    parser.add_argument("--max_prompt_length", type=int, default=1024, help="Maximum prompt length in tokens.")
-    parser.add_argument("--max_completion_length", type=int, default=1024, help="Maximum completion length (max_new_tokens).")
+    parser.add_argument("--max_prompt_length", type=int, default=256, help="Maximum prompt length in tokens.")
+    parser.add_argument("--max_completion_length", type=int, default=786, help="Maximum completion length (max_new_tokens).")
 
     # Run Configuration
     parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
@@ -69,7 +69,7 @@ def get_args():
 
     # Logging and Saving
     parser.add_argument("--logging_steps", type=int, default=1, help="Log every N steps.")
-    parser.add_argument("--save_steps", type=int, default=200, help="Save a checkpoint every N steps.")
+    parser.add_argument("--save_steps", type=int, default=500, help="Save a checkpoint every N steps.")
     return parser.parse_args()
 args = get_args()
 
