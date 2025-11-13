@@ -9,6 +9,7 @@ import torch
 import argparse
 from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM
+import wandb
 
 from trl import GRPOConfig, GRPOTrainer
 import numpy as np
@@ -40,7 +41,7 @@ def get_args():
     parser.add_argument("--gamma", type=float, default=1, help="The discount factor for controlling lengths of completions in the GRPO loss.")
     parser.add_argument("--beta", type=float, default=0.1, help="The beta parameter for the GRPO loss.")
     parser.add_argument("--num_train_epochs", type=int, default=1, help="Total number of training epochs.")
-    parser.add_argument("--per_device_train_batch_size", type=int, default=4, help="Training batch size per device.")
+    parser.add_argument("--per_device_train_batch_size", type=int, default=6, help="Training batch size per device.")
     parser.add_argument("--gradient_accumulation_steps", type=int, default=4, help="Number of steps for gradient accumulation.")
     parser.add_argument("--warmup_ratio", type=float, default=0.1, help="Warmup ratio for the learning rate scheduler.")
     parser.add_argument("--lr_scheduler_type", type=str, default="constant_with_warmup", help="Learning rate scheduler type.")
@@ -74,6 +75,22 @@ def get_args():
 args = get_args()
 
 
+
+#model_name = "meta-llama/Llama-3.2-1B-Instruct"
+model_name = args.model_name
+seed=args.seed
+machine_name = args.machine_name
+GAMMA = args.gamma
+
+model_short_name = args.model_name.split("/")[-1]
+run_name = f"{model_short_name}-gsm8k-gamma{GAMMA}-seed{args.seed}-{args.machine_name}"
+output_dir = f"{args.output_dir}/{run_name}"
+
+
+# Initialize Weights & Biases
+if args.report_to == "wandb":
+    wandb.init(project="caching-training", name=run_name) 
+    # 'name' will be the run name, 'project' will be the project name
 
 
 # Load and prep dataset
@@ -257,15 +274,6 @@ def training_reward_adjustment(
 
 # --- Model and Training Configuration ---
 
-#model_name = "meta-llama/Llama-3.2-1B-Instruct"
-model_name = args.model_name
-seed=args.seed
-machine_name = args.machine_name
-GAMMA = args.gamma
-
-model_short_name = args.model_name.split("/")[-1]
-run_name = f"{model_short_name}-gsm8k-gamma{GAMMA}-seed{args.seed}-{args.machine_name}"
-output_dir = f"{args.output_dir}/{run_name}"
 
 
 gen_kwargs = {
